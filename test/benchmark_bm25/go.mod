@@ -2,16 +2,14 @@ module github.com/weaviate/weaviate/test/benchmark_bm25
 
 go 1.19
 
-replace (
-	github.com/weaviate/weaviate => ../..
-)
+replace github.com/weaviate/weaviate => ../..
 
 require (
 	github.com/go-openapi/strfmt v0.21.3
 	github.com/google/uuid v1.3.0
 	github.com/spf13/cobra v1.6.1
-	github.com/weaviate/weaviate v1.19.0-beta.1.0.20230424082040-b053defd25ee
-	github.com/weaviate/weaviate-go-client/v4 v4.6.3
+	github.com/weaviate/weaviate v1.19.13-0.20230706120536-85b5f0f4fa43
+	github.com/weaviate/weaviate-go-client/v4 v4.9.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -34,9 +32,9 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	go.mongodb.org/mongo-driver v1.11.0 // indirect
+	go.mongodb.org/mongo-driver v1.11.3 // indirect
 	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094 // indirect
+	golang.org/x/oauth2 v0.4.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
