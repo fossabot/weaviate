@@ -30,11 +30,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/weaviate/weaviate/adapters/handlers/rest/state"
 	"github.com/go-openapi/runtime/flagext"
 	"github.com/go-openapi/swag"
 	flags "github.com/jessevdk/go-flags"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 	"golang.org/x/net/netutil"
 
+	"github.com/weaviate/weaviate/adapters/handlers/grpc"
 	"github.com/weaviate/weaviate/adapters/handlers/rest/operations"
 )
 
@@ -65,7 +69,7 @@ func NewServer(api *operations.WeaviateAPI) *Server {
 // ConfigureAPI configures the API and handlers.
 func (s *Server) ConfigureAPI() {
 	if s.api != nil {
-		s.handler = configureAPI(s.api)
+		s.handler,s.grpcServer, s.appState = configureAPI(s.api)
 	}
 }
 
@@ -107,6 +111,8 @@ type Server struct {
 
 	api          *operations.WeaviateAPI
 	handler      http.Handler
+	grpcServer   *grpc.GRPCServer
+	appState *state.State
 	hasListeners bool
 	shutdown     chan struct{}
 	shuttingDown int32
@@ -143,7 +149,7 @@ func (s *Server) SetAPI(api *operations.WeaviateAPI) {
 	}
 
 	s.api = api
-	s.handler = configureAPI(api)
+	s.handler, s.grpcServer, s.appState = configureAPI(api)
 }
 
 func (s *Server) hasScheme(scheme string) bool {
@@ -515,4 +521,28 @@ func handleInterrupt(once *sync.Once, s *Server) {
 
 func signalNotify(interrupt chan<- os.Signal) {
 	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
+}
+
+
+func startCombinedServer(httpServer *http.Server, grpcServer *grpc.GRPCServer, address string) {
+	h2s := &http2.Server{}
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 && r.Header.Get("Content-Type") == "application/grpc" {
+			grpcServer.ServeHTTP(w, r)
+		} else {
+			httpServer.Handler.ServeHTTP(w, r)
+		}
+	})
+
+	httpServer.Handler = h2c.NewHandler(handler, h2s)
+
+	listen, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatalf("Failed to listen: %v", err)
+	}
+
+	log.Printf("Serving gRPC and HTTP on %s", address)
+	if err := httpServer.Serve(listen); err != nil {
+		log.Fatalf("Failed to serve: %v", err)
+	}
 }
