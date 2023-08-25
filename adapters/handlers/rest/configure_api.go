@@ -85,7 +85,7 @@ import (
 
 const MinimumRequiredContextionaryVersion = "1.0.2"
 
-func makeConfigureServer(appState *state.State) func(*http.Server, string, string) {
+func makeConfigureAppstate(appState *state.State) func(*http.Server, string, string) {
 	return func(s *http.Server, scheme, addr string) {
 		// Add properties to the config
 		appState.ServerConfig.Hostname = addr
@@ -351,7 +351,7 @@ func configureAPI(api *operations.WeaviateAPI) (http.Handler, *grpc.GRPCServer,*
 			panic(err)
 		}
 	}
-	configureServer = makeConfigureServer(appState)
+	configureServer = makeConfigureAppstate(appState)
 	setupMiddlewares := makeSetupMiddlewares(appState)
 	setupGlobalMiddleware := makeSetupGlobalMiddleware(appState)
 

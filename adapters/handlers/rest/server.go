@@ -214,7 +214,7 @@ func (s *Server) Serve() (err error) {
 	}
 
 	if s.hasScheme(schemeHTTP) {
-		httpServer := new(http.Server)
+		httpServer := createServer(s.grpcServer, s.handler)
 		httpServer.MaxHeaderBytes = int(s.MaxHeaderSize)
 		httpServer.ReadTimeout = s.ReadTimeout
 		httpServer.WriteTimeout = s.WriteTimeout
@@ -227,16 +227,17 @@ func (s *Server) Serve() (err error) {
 			httpServer.IdleTimeout = s.CleanupTimeout
 		}
 
-		httpServer.Handler = s.handler
+		httpServer.Handler = makeSharedPortHandlerFunc(s.grpcServer, s.handler)
 
 		configureServer(httpServer, "http", s.httpServerL.Addr().String())
+
+
 
 		servers = append(servers, httpServer)
 		wg.Add(1)
 		s.Logf("Serving weaviate at http://%s", s.httpServerL.Addr())
 		go func(l net.Listener) {
 			defer wg.Done()
-			startServer(l, s.grpcServer, s.handler)
 			if err := httpServer.Serve(l); err != nil && err != http.ErrServerClosed {
 				s.Fatalf("%v", err)
 			}
@@ -256,7 +257,7 @@ func (s *Server) Serve() (err error) {
 		if int64(s.CleanupTimeout) > 0 {
 			httpsServer.IdleTimeout = s.CleanupTimeout
 		}
-		httpsServer.Handler = s.handler
+		httpsServer.Handler = makeSharedPortHandlerFunc(s.grpcServer, s.handler)
 
 		// Inspired by https://blog.bracebin.com/achieving-perfect-ssl-labs-score-with-go
 		httpsServer.TLSConfig = &tls.Config{
@@ -549,7 +550,7 @@ func startCombinedServer(httpServer *http.Server, grpcServer *grpc.GRPCServer, a
 	}
 }
 
-func grpcHandlerFunc(grpcServer *grpc.GRPCServer, otherHandler http.Handler) http.Handler {
+func makeSharedPortHandlerFunc(grpcServer *grpc.GRPCServer, otherHandler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
 			fmt.Printf("Running grpc handler\n")
@@ -559,20 +560,4 @@ func grpcHandlerFunc(grpcServer *grpc.GRPCServer, otherHandler http.Handler) htt
 			otherHandler.ServeHTTP(w, r)
 		}
 	})
-}
-
-
-func startServer(listener net.Listener, grpcServer *grpc.GRPCServer, otherHandler http.Handler) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		
-		grpcHandlerFunc(grpcServer, otherHandler).ServeHTTP(w, r)
-	})
-
-	server := &http.Server{
-		
-		Handler: h2c.NewHandler(mux, &http2.Server{}),
-	}
-
-	return server.Serve(listener)
 }
