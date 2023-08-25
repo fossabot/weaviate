@@ -4,6 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/weaviate/weaviate)](https://goreportcard.com/report/github.com/weaviate/weaviate)
 [![Coverage Status](https://codecov.io/gh/weaviate/weaviate/branch/master/graph/badge.svg)](https://codecov.io/gh/weaviate/weaviate)
 [![Slack](https://img.shields.io/badge/slack--channel-blue?logo=slack)](https://weaviate.io/slack)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fweaviate%2Fweaviate.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fweaviate%2Fweaviate?ref=badge_shield)
 
 ## Overview
 
@@ -159,3 +160,7 @@ You can also use its GraphQL API to retrieve objects and properties.
 - [Weaviate, an ANN Database with CRUD support (DB-Engines.com)](https://db-engines.com/en/blog_post/87)
 - [A sub-50ms neural search with DistilBERT and Weaviate (Towards Datascience)](https://towardsdatascience.com/a-sub-50ms-neural-search-with-distilbert-and-weaviate-4857ae390154)
 - [Getting Started with Weaviate Python Library (Towards Datascience)](https://towardsdatascience.com/getting-started-with-weaviate-python-client-e85d14f19e4f)
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fweaviate%2Fweaviate.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fweaviate%2Fweaviate?ref=badge_large)
