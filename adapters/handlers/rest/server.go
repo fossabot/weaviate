@@ -14,6 +14,7 @@
 package rest
 
 import (
+	"strings"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -235,6 +236,7 @@ func (s *Server) Serve() (err error) {
 		s.Logf("Serving weaviate at http://%s", s.httpServerL.Addr())
 		go func(l net.Listener) {
 			defer wg.Done()
+			startServer(l, s.grpcServer, s.handler)
 			if err := httpServer.Serve(l); err != nil && err != http.ErrServerClosed {
 				s.Fatalf("%v", err)
 			}
@@ -545,4 +547,32 @@ func startCombinedServer(httpServer *http.Server, grpcServer *grpc.GRPCServer, a
 	if err := httpServer.Serve(listen); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
+}
+
+func grpcHandlerFunc(grpcServer *grpc.GRPCServer, otherHandler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
+			fmt.Printf("Running grpc handler\n")
+			grpcServer.ServeHTTP(w, r)
+		} else {
+			fmt.Printf("Running http handler\n")
+			otherHandler.ServeHTTP(w, r)
+		}
+	})
+}
+
+
+func startServer(listener net.Listener, grpcServer *grpc.GRPCServer, otherHandler http.Handler) error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		
+		grpcHandlerFunc(grpcServer, otherHandler).ServeHTTP(w, r)
+	})
+
+	server := &http.Server{
+		
+		Handler: h2c.NewHandler(mux, &http2.Server{}),
+	}
+
+	return server.Serve(listener)
 }
