@@ -14,7 +14,6 @@
 package rest
 
 import (
-	"strings"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -31,15 +30,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/weaviate/weaviate/adapters/handlers/rest/state"
 	"github.com/go-openapi/runtime/flagext"
 	"github.com/go-openapi/swag"
 	flags "github.com/jessevdk/go-flags"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"golang.org/x/net/netutil"
 
-	"github.com/weaviate/weaviate/adapters/handlers/grpc"
 	"github.com/weaviate/weaviate/adapters/handlers/rest/operations"
 )
 
@@ -70,7 +65,7 @@ func NewServer(api *operations.WeaviateAPI) *Server {
 // ConfigureAPI configures the API and handlers.
 func (s *Server) ConfigureAPI() {
 	if s.api != nil {
-		s.handler,s.grpcServer, s.appState = configureAPI(s.api)
+		s.handler = configureAPI(s.api)
 	}
 }
 
@@ -112,8 +107,6 @@ type Server struct {
 
 	api          *operations.WeaviateAPI
 	handler      http.Handler
-	grpcServer   *grpc.GRPCServer
-	appState *state.State
 	hasListeners bool
 	shutdown     chan struct{}
 	shuttingDown int32
@@ -150,7 +143,7 @@ func (s *Server) SetAPI(api *operations.WeaviateAPI) {
 	}
 
 	s.api = api
-	s.handler, s.grpcServer, s.appState = configureAPI(api)
+	s.handler = configureAPI(api)
 }
 
 func (s *Server) hasScheme(scheme string) bool {
@@ -214,7 +207,7 @@ func (s *Server) Serve() (err error) {
 	}
 
 	if s.hasScheme(schemeHTTP) {
-		httpServer := createServer(s.grpcServer, s.handler)
+		httpServer := new(http.Server)
 		httpServer.MaxHeaderBytes = int(s.MaxHeaderSize)
 		httpServer.ReadTimeout = s.ReadTimeout
 		httpServer.WriteTimeout = s.WriteTimeout
@@ -227,11 +220,9 @@ func (s *Server) Serve() (err error) {
 			httpServer.IdleTimeout = s.CleanupTimeout
 		}
 
-		httpServer.Handler = makeSharedPortHandlerFunc(s.grpcServer, s.handler)
+		httpServer.Handler = s.handler
 
 		configureServer(httpServer, "http", s.httpServerL.Addr().String())
-
-
 
 		servers = append(servers, httpServer)
 		wg.Add(1)
@@ -257,7 +248,7 @@ func (s *Server) Serve() (err error) {
 		if int64(s.CleanupTimeout) > 0 {
 			httpsServer.IdleTimeout = s.CleanupTimeout
 		}
-		httpsServer.Handler = makeSharedPortHandlerFunc(s.grpcServer, s.handler)
+		httpsServer.Handler = s.handler
 
 		// Inspired by https://blog.bracebin.com/achieving-perfect-ssl-labs-score-with-go
 		httpsServer.TLSConfig = &tls.Config{
@@ -524,40 +515,4 @@ func handleInterrupt(once *sync.Once, s *Server) {
 
 func signalNotify(interrupt chan<- os.Signal) {
 	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
-}
-
-
-func startCombinedServer(httpServer *http.Server, grpcServer *grpc.GRPCServer, address string) {
-	h2s := &http2.Server{}
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.ProtoMajor == 2 && r.Header.Get("Content-Type") == "application/grpc" {
-			grpcServer.ServeHTTP(w, r)
-		} else {
-			httpServer.Handler.ServeHTTP(w, r)
-		}
-	})
-
-	httpServer.Handler = h2c.NewHandler(handler, h2s)
-
-	listen, err := net.Listen("tcp", address)
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-
-	log.Printf("Serving gRPC and HTTP on %s", address)
-	if err := httpServer.Serve(listen); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
-	}
-}
-
-func makeSharedPortHandlerFunc(grpcServer *grpc.GRPCServer, otherHandler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.ProtoMajor == 2 && strings.Contains(r.Header.Get("Content-Type"), "application/grpc") {
-			fmt.Printf("Running grpc handler\n")
-			grpcServer.ServeHTTP(w, r)
-		} else {
-			fmt.Printf("Running http handler\n")
-			otherHandler.ServeHTTP(w, r)
-		}
-	})
 }
